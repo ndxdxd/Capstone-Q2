@@ -8,6 +8,9 @@ import cv2
 import random
 
 from utils import show_image, preprocess_image, clip_eps, get_label
+IMAGENET_LABELS = "./data/imagenet_class_index.json"
+with open(IMAGENET_LABELS) as f:
+    IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
 
 def generate_adversaries_targeted(image_tensor, delta, model, true_index, target_indices, optimizer,eps):
     """
@@ -43,6 +46,7 @@ def generate_adversaries_targeted(image_tensor, delta, model, true_index, target
             # Combine the losses with appropriate weights
             loss = true_loss + target_loss  # Adjust the weight (0.1) as needed
             
+            
             if t % 20 == 0:
                 print(f"Iteration {t}, Loss: {loss.numpy()}")
         
@@ -72,16 +76,20 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS):
 
     # Generate predictions before any adversaries
     unsafe_preds = model.predict(preprocess_input(preprocessed_image))
-    print(unsafe_preds)
-    unsafe_probs = tf.nn.softmax(unsafe_preds).numpy()  # Apply softmax
-    print("Prediction before adv.:", decode_predictions(unsafe_probs, top=3)[0])
+    print("Logits before adv.:", decode_predictions(unsafe_preds, top=3)[0])
 
+    print("\nPredictions for secret labels BEFORE perturbation:")
+    for label in target_labels:
+        label_name = IMAGENET_CLASSES[label]
+        logit = (unsafe_preds[0, label])
+        print(f"Label: {label_name} (Index: {label}), Logit: {logit}")
+        
     # Initialize the perturbation tensor
     image_tensor = tf.constant(preprocessed_image, dtype=tf.float32)
     delta = tf.Variable(tf.zeros_like(image_tensor), trainable=True)
 
     # Get the learned delta and display it
-    delta_tensor = generate_adversaries_targeted(image_tensor, delta, model, true_label, target_labels, optimizer,EPS)
+    delta_tensor = generate_adversaries_targeted(image_tensor, delta, model, true_label, target_labels, optimizer, EPS)
     plt.imshow(50 * delta_tensor.numpy().squeeze() + 0.5)
     plt.show()
 
@@ -92,29 +100,49 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS):
     # Generate prediction
     perturbed_image = preprocess_input(image_tensor + delta_tensor)
     preds = model.predict(perturbed_image)
-    print(preds)
-    probs = tf.nn.softmax(preds).numpy()  # Apply softmax
-    print("Prediction after adv.:", decode_predictions(probs, top=10)[0])
+
+    print("Logits after adv.:", decode_predictions(preds, top=3)[0])
+
+    # Print predictions for the secret labels
+    print("\nPredictions for secret labels:")
+    for label in target_labels:
+        label_name = IMAGENET_CLASSES[label]
+        logit = (preds[0, label])
+        print(f"Label: {label_name} (Index: {label}), Logit: {logit}")
+    
 
     # Verify the watermark
-    if verify_watermark(probs, target_labels, threshold=0.000000001):
+    # Verify the watermark using logit differences
+    if verify_watermark(unsafe_preds, preds, target_labels, threshold=.01):
         print("Watermark verified!")
     else:
         print("Watermark NOT verified.")
 
-def verify_watermark(probs, target_labels, threshold=0.1):
+def verify_watermark(logits_before, logits_after, target_labels, threshold=.01):
     """
-    Verify the watermark by checking if the probabilities of the target labels exceed a threshold.
+    Verify the watermark by checking if the increase in logits of the target labels exceeds a threshold.
     
     Args:
-        probs (numpy.ndarray): Probabilities output by the model (shape: [1, 1000]).
+        logits_before (numpy.ndarray): Logits before perturbation (shape: [1, 1000]).
+        logits_after (numpy.ndarray): Logits after perturbation (shape: [1, 1000]).
         target_labels (list): Indices of the target classes (secret labels).
-        threshold (float): Threshold for watermark verification.
+        threshold (float): Threshold for the increase in logits.
     
     Returns:
         bool: True if the watermark is verified, False otherwise.
     """
     for label in target_labels:
-        if probs[0, label] < threshold:
-            return False  # At least one target label does not exceed the threshold
-    return True  # All target labels exceed the threshold
+        logit_before = logits_before[0, label]
+        logit_after = logits_after[0, label]
+        logit_diff = np.abs(logit_after - logit_before)
+
+        if logit_before > logit_after:
+            return False
+        
+        # If the increase in logits is less than the threshold, verification fails
+        print(f" Label: {label} , logit_diff : {logit_diff}")
+        if logit_diff < threshold:
+            return False
+    
+    # If all target labels exceed the threshold, verification succeeds
+    return True
