@@ -6,6 +6,7 @@ import numpy as np
 import json
 import cv2
 import random
+import os
 
 from utils import show_image, preprocess_image, clip_eps, get_label
 IMAGENET_LABELS = "./data/imagenet_class_index.json"
@@ -59,7 +60,7 @@ def generate_adversaries_targeted(image_tensor, delta, model, true_index, target
     
     return delta
 
-def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS):
+def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, save_dir="./output"):
     """
     Perturb an image to embed a watermark and verify the watermark.
     
@@ -71,8 +72,16 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS):
         optimizer (tf.keras.optimizers.Optimizer): Optimizer for training.
     """
     # Load and preprocess image
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
     sample_image = show_image(image_path)
     preprocessed_image = preprocess_image(sample_image)
+
+    preprocessed_path = os.path.join(save_dir, "preprocessed_image.png")
+    plt.imsave(preprocessed_path, preprocessed_image.squeeze())
+    print(f"Preprocessed image saved at: {preprocessed_path}")
+
 
     # Generate predictions before any adversaries
     unsafe_preds = model.predict(preprocess_input(preprocessed_image))
@@ -98,8 +107,9 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS):
     plt.show()
 
     # Generate prediction
-    perturbed_image = preprocess_input(image_tensor + delta_tensor)
+    perturbed_image = preprocess_input(image_tensor + delta_tensor)    
     preds = model.predict(perturbed_image)
+
 
     print("Logits after adv.:", decode_predictions(preds, top=3)[0])
 
@@ -109,6 +119,8 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS):
         label_name = IMAGENET_CLASSES[label]
         logit = (preds[0, label])
         print(f"Label: {label_name} (Index: {label}), Logit: {logit}")
+
+    
     
 
     # Verify the watermark
