@@ -146,7 +146,7 @@ def verify_watermark(logits_before, logits_after, target_labels, threshold=.01):
     for label in target_labels:
         logit_before = logits_before[0, label]
         logit_after = logits_after[0, label]
-        logit_diff = np.abs(logit_after - logit_before)
+        logit_diff = logit_after - logit_before
 
         if logit_before > logit_after:
             return False
