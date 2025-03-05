@@ -62,7 +62,7 @@ def verify_watermark(logits_before, logits_after, target_labels, threshold=3):
     if avg_diff<threshold:
         verified = False
     print(avg_diff)
-    return verified/
+    return verified
 
 def perturb_image(image_path, true_label, model, optimizer, eps, k=5):
     sample_image = show_image(image_path)
