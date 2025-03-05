@@ -1,3 +1,14 @@
 torch
 torchvision
 torchattack
+kagglehub
+transformers
+diffusers
+opencv-python
+scikit-image
+matplotlib
+bm3d
+compressai
+torch_fidelity
+accelerate
+onnxruntime

@@ -107,15 +107,28 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, 
     plt.imshow(50 * delta_tensor.numpy().squeeze() + 0.5)
     plt.show()
 
+
+    final_image = (image_tensor + delta_tensor).numpy().squeeze()
+    final_image = np.clip(final_image, 0, 255).astype(np.uint8)  # Ensure pixel values are in valid range
+    
     # Save the perturbed image
-    perturbed_image = (image_tensor + delta_tensor).numpy().squeeze() / 255
+    output_folder = "./output"
+    output_path = os.path.join(output_folder, "whitebox_watermarked_image.jpg")  # Save in the output folder
+    
+    # Ensure the output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    
+    # Save the image
+    cv2.imwrite(output_path, cv2.cvtColor(final_image, cv2.COLOR_RGB2BGR))  # Convert RGB to BGR for OpenCV
+    print(f"Watermarked image saved as {output_path}")
 
     # Clip the pixel values to the valid range [0, 1]
-    perturbed_image = np.clip(perturbed_image, 0, 1)
+    # perturbed_image = np.clip(perturbed_image, 0, 1)
 
-    perturbed_image_path = os.path.join(save_dir, "perturbed_image.png")
-    plt.imsave(perturbed_image_path, perturbed_image)
-    print(f"Perturbed image saved at: {perturbed_image_path}")
+    # perturbed_image_path = os.path.join(save_dir, "perturbed_image.png")
+    # plt.imsave(perturbed_image_path, perturbed_image)
+    # print(f"Perturbed image saved at: {perturbed_image_path}")
 
     # See if the image changes
     plt.imshow((image_tensor + delta_tensor).numpy().squeeze() / 255)
@@ -142,7 +155,8 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, 
 
     # Verify the watermark
     # Verify the watermark using logit differences
-    if verify_watermark(unsafe_preds, preds, target_labels, threshold=.01):
+    verified, avg_diff = verify_watermark(unsafe_preds, preds, target_labels, threshold=0.01)
+    if verified:
         print("Watermark verified!")
     else:
         print("Watermark NOT verified.")
@@ -150,7 +164,7 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, 
     # Return logit scores for secret labels before and after watermarking
     logits_before = {label: unsafe_preds[0, label] for label in target_labels}
     logits_after = {label: preds[0, label] for label in target_labels}
-    return logits_before,logits_after,unsafe_preds, preds
+    return logits_before,logits_after,unsafe_preds, preds, avg_diff
 
 def verify_watermark(logits_before, logits_after, target_labels, threshold=1):
     """
@@ -178,7 +192,7 @@ def verify_watermark(logits_before, logits_after, target_labels, threshold=1):
     if avg_diff<threshold:
         verified = False
     print(f"Average Difference: {avg_diff}")
-    return verified
+    return verified, avg_diff
     # for label in target_labels:
     #     logit_before = logits_before[0, label]
     #     logit_after = logits_after[0, label]
