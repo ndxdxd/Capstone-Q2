@@ -18,8 +18,9 @@ def preprocess_image(image_pixels, preprocess=False):
         image_pixels = preprocess_input(image_pixels)
     image_pixels = cv2.resize(image_pixels, (224, 224))
     image_pixels = np.expand_dims(image_pixels, axis=0)
-    plt.imshow(image_pixels)
+    plt.imshow(image_pixels[0])  # Remove batch dimension before displaying
     plt.show()
+
     return image_pixels
 
 # Clipping utility to project delta back to a favorable pixel range
