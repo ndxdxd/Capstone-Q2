@@ -7,8 +7,9 @@ import json
 import cv2
 import random
 import os
+from PIL import Image
 
-from utils import show_image, preprocess_image, clip_eps, get_label
+from utils_whitebox import show_image, preprocess_image, clip_eps, get_label
 IMAGENET_LABELS = "./data/imagenet_class_index.json"
 with open(IMAGENET_LABELS) as f:
     IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
@@ -33,6 +34,7 @@ def generate_adversaries_targeted(image_tensor, delta, model, true_index, target
     for t in range(iterations):
         with tf.GradientTape() as tape:
             tape.watch(delta)
+            
             inp = preprocess_input(image_tensor + delta)
             predictions = model(inp, training=False)
             
@@ -47,7 +49,7 @@ def generate_adversaries_targeted(image_tensor, delta, model, true_index, target
             # Combine the losses with appropriate weights
             target_loss /= len(target_indices)
             
-            loss = true_loss + target_loss * (1.0)  # Adjust the weight as needed
+            loss = true_loss + target_loss * (3.0)  # Adjust the weight as needed
             
             
             if t % 20 == 0:
@@ -62,7 +64,7 @@ def generate_adversaries_targeted(image_tensor, delta, model, true_index, target
     
     return delta
 
-def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, iterations = 350, save_dir="./output"):
+def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS ,iterations = 350, save_dir="./output"):
     """
     Perturb an image to embed a watermark and verify the watermark.
     
@@ -104,6 +106,8 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, 
 
     # Get the learned delta and display it
     delta_tensor = generate_adversaries_targeted(image_tensor, delta, model, true_label, target_labels, optimizer, EPS, iterations)
+
+
     plt.imshow(50 * delta_tensor.numpy().squeeze() + 0.5)
     plt.show()
 
@@ -131,6 +135,7 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, 
     # print(f"Perturbed image saved at: {perturbed_image_path}")
 
     # See if the image changes
+    
     plt.imshow((image_tensor + delta_tensor).numpy().squeeze() / 255)
     plt.show()
 
@@ -155,7 +160,7 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS, 
 
     # Verify the watermark
     # Verify the watermark using logit differences
-    verified, avg_diff = verify_watermark(unsafe_preds, preds, target_labels, threshold=0.01)
+    verified, avg_diff = verify_watermark(unsafe_preds, preds, target_labels, threshold=1)
     if verified:
         print("Watermark verified!")
     else:
@@ -179,48 +184,104 @@ def verify_watermark(logits_before, logits_after, target_labels, threshold=1):
     Returns:
         bool: True if the watermark is verified, False otherwise.
     """
-    verified = True  # Assume verification succeeds until proven otherwise
+    # verified = True  # Assume verification succeeds until proven otherwise
+    # logits_d = []
+    # for label in target_labels:
+    #     logit_before = logits_before[0, label]
+    #     logit_after = logits_after[0, label]
+    #     logit_diff = logit_after - logit_before  # Calculate the difference
+
+    #     logits_d.append(logit_diff)
+    #     print(f"Label: {IMAGENET_CLASSES[label]} ({label}) | Logit Before: {logit_before:.5f} | Logit After: {logit_after:.5f} | Logit Diff: {logit_diff:.5f}")
+    # avg_diff = sum(logits_d)/ len(logits_d)
+    # if avg_diff<threshold:
+    #     verified = False
+    # print(f"Average Difference: {avg_diff}")
+    # return verified, avg_diff
+    verified = False  # Assume verification fails unless proven otherwise
     logits_d = []
+    positive_changes = 0  # Counter for positive logit differences
+
     for label in target_labels:
         logit_before = logits_before[0, label]
         logit_after = logits_after[0, label]
         logit_diff = logit_after - logit_before  # Calculate the difference
-
+        
+        # Store the logit difference
         logits_d.append(logit_diff)
         print(f"Label: {IMAGENET_CLASSES[label]} ({label}) | Logit Before: {logit_before:.5f} | Logit After: {logit_after:.5f} | Logit Diff: {logit_diff:.5f}")
-    avg_diff = sum(logits_d)/ len(logits_d)
-    if avg_diff<threshold:
-        verified = False
-    print(f"Average Difference: {avg_diff}")
-    return verified, avg_diff
-    # for label in target_labels:
-    #     logit_before = logits_before[0, label]
-    #     logit_after = logits_after[0, label]
-    #     logit_diff = logit_after - logit_before
-
-    #     if logit_before > logit_after:
-    #         return False
         
-    #     # If the increase in logits is less than the threshold, verification fails
-    #     print(f" Label: {label} , logit_diff : {logit_diff}")
-    #     if logit_diff < threshold:
-    #         return False
+        # Count how many times the logit difference is positive
+        if logit_diff > 0:
+            positive_changes += 1
     
-    # # If all target labels exceed the threshold, verification succeeds
-    # return True
+    # Calculate the percentage of labels with positive logit differences
+    positive_percentage = (positive_changes / len(target_labels)) * 100
+    print(f"Percentage of labels with positive logit difference: {positive_percentage:.2f}%")
+    
+    # If 50% or more of the logit differences are positive, consider the watermark verified
+    if positive_percentage >= 50:
+        verified = True
+    
+    return verified, logits_d
 
 
-def collect_logits(image_folder, target_labels, model, optimizer, EPS):
-    before_logits = []
-    after_logits = []
+def display_one_image_per_folder(root_folder, secret_labels,resnet50, optimizer, EPS, iterations = 350, max_folders=10):
+    """
+    Display one image from each of `max_folders` randomly selected subfolders with the folder name as the title.
 
-    for root, dirs, files in os.walk(image_folder):
-        for file in files:
-            if file.endswith(".JPEG"):
-                image_path = os.path.join(root, file)
-                unsafe_preds, preds = perturb_image(image_path, target_labels, model, optimizer, EPS)
-                before_logits.append(unsafe_preds)
-                after_logits.append(preds)
+    Args:
+        root_folder (str): Path to the folder containing subfolders with images.
+        max_folders (int): Maximum number of folders to process.
+    """
+    # Get a list of all subfolders
+    subfolders = [f.path for f in os.scandir(root_folder) if f.is_dir()]
+    
 
-    return before_logits, after_logits
+
+    subfolders = subfolders[:max_folders]
+    
+
+    all_logits_before = {label: [] for label in secret_labels}
+    all_logits_after = {label: [] for label in secret_labels}
+    count = 1
+
+    # Iterate through each subfolder
+    for folder in subfolders:
+        # Get the folder name (ID)
+        folder_name = os.path.basename(folder)
+
+        # Get a list of images in the folder
+        images = [f for f in os.listdir(folder) if f.endswith(('.jpg', '.jpeg', '.png', '.JPEG'))]
+
+        print(f'Image: #{count}')
+        count += 1
+        if images:
+            first_image_path = os.path.join(folder, images[0])
+
+            # Open and display the image
+            img = show_image(first_image_path)
+            preprocessed_image = preprocess_image(img, preprocess=True)
+
+            preds = resnet50.predict(preprocessed_image)
+            print("Logits:", decode_predictions(preds, top=3)[0])
+            print("Class idx:", preds.argmax())
+
+            true_label = preds.argmax()
+            # Perturb the image and get logit scores
+            logits_before, logits_after,logits_before_all,logits_after_all, _ = perturb_image(first_image_path, true_label, secret_labels, resnet50, optimizer, EPS, iterations)
+
+            # Store logit scores
+            for label in secret_labels:
+                all_logits_before[label].append(logits_before[label])
+                all_logits_after[label].append(logits_after[label])
+
+        
+
+        else:
+            print(f"No images found in folder: {folder_name}")
+    return all_logits_before, all_logits_after, logits_before_all,logits_after_all 
+
+
+
 
