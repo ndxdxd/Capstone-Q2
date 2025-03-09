@@ -88,7 +88,7 @@ def display_one_image_per_folder(root_folder, max_folders=10):
             print(f"No images found in folder: {folder_name}")
     return all_logits_before, all_logits_after, logits_before_all,logits_after_all 
 
-def plot_combined_histogram(all_logits_before, all_logits_after, bins=100, save_dir="./plots/"):
+def plot_combined_histogram(all_logits_before, all_logits_after, bins=100, save_dir="../plots/"):
     """
     Plot a combined histogram of logit scores for all labels before and after watermarking and save as an image.
     
@@ -111,7 +111,7 @@ def plot_combined_histogram(all_logits_before, all_logits_after, bins=100, save_
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()  # Close the figure to free memory
 
-def plot_roc_curve(all_logits_before, all_logits_after, target_labels, save_dir="./plots/"):
+def plot_roc_curve(all_logits_before, all_logits_after, target_labels, save_dir="../plots/"):
     """
     Plot ROC curve for each target label to determine the optimal threshold and save as an image.
     
@@ -152,7 +152,7 @@ def plot_logit_histograms(all_logits_before, all_logits_after, target_labels):
         all_logits_after (dict): Logit scores after watermarking for each label.
         target_labels (list): Indices of the target classes (secret labels).
     """
-    IMAGENET_LABELS = "./data/imagenet_class_index.json"
+    IMAGENET_LABELS = "../data/imagenet_class_index.json"
     with open(IMAGENET_LABELS) as f:
         IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
     for label in target_labels:
@@ -164,7 +164,7 @@ def plot_logit_histograms(all_logits_before, all_logits_after, target_labels):
         plt.ylabel("Frequency")
         plt.title(f"Logit Scores for Label {IMAGENET_CLASSES[label]} (Index: {label}) at k = 4")
         plt.show()
-        filename = f"./plots/blackbox_logit_dih{label}.png"
+        filename = f"../plots/blackbox_logit_{label}.png"
         plt.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close()  # Close the figure to free memory
 

@@ -10,7 +10,7 @@ import os
 from PIL import Image
 
 from utils_whitebox import show_image, preprocess_image, clip_eps, get_label
-IMAGENET_LABELS = "./data/imagenet_class_index.json"
+IMAGENET_LABELS = "../data/imagenet_class_index.json"
 with open(IMAGENET_LABELS) as f:
     IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
 
@@ -64,7 +64,7 @@ def generate_adversaries_targeted(image_tensor, delta, model, true_index, target
     
     return delta
 
-def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS ,iterations = 350, save_dir="./output"):
+def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS ,iterations = 350, save_dir="../output"):
     """
     Perturb an image to embed a watermark and verify the watermark.
     
@@ -107,6 +107,14 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS ,
     # Get the learned delta and display it
     delta_tensor = generate_adversaries_targeted(image_tensor, delta, model, true_label, target_labels, optimizer, EPS, iterations)
 
+    delta_image = 50 * delta_tensor.numpy().squeeze() + 0.5  # Scale and shift
+    delta_image = np.clip(delta_image, 0, 1)  # Ensure values are in [0,1]
+    
+    # Save the image
+    output_path = "../output/delta_image.png"
+    plt.imsave(output_path, delta_image)  # Use cmap="gray" for better visualization
+    print(f"Delta image saved at {output_path}")
+
 
     plt.imshow(50 * delta_tensor.numpy().squeeze() + 0.5)
     plt.show()
@@ -116,7 +124,7 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, EPS ,
     final_image = np.clip(final_image, 0, 255).astype(np.uint8)  # Ensure pixel values are in valid range
     
     # Save the perturbed image
-    output_folder = "./output"
+    output_folder = "../output"
     output_path = os.path.join(output_folder, "whitebox_watermarked_image.jpg")  # Save in the output folder
     
     # Ensure the output folder exists
@@ -184,20 +192,6 @@ def verify_watermark(logits_before, logits_after, target_labels, threshold=1):
     Returns:
         bool: True if the watermark is verified, False otherwise.
     """
-    # verified = True  # Assume verification succeeds until proven otherwise
-    # logits_d = []
-    # for label in target_labels:
-    #     logit_before = logits_before[0, label]
-    #     logit_after = logits_after[0, label]
-    #     logit_diff = logit_after - logit_before  # Calculate the difference
-
-    #     logits_d.append(logit_diff)
-    #     print(f"Label: {IMAGENET_CLASSES[label]} ({label}) | Logit Before: {logit_before:.5f} | Logit After: {logit_after:.5f} | Logit Diff: {logit_diff:.5f}")
-    # avg_diff = sum(logits_d)/ len(logits_d)
-    # if avg_diff<threshold:
-    #     verified = False
-    # print(f"Average Difference: {avg_diff}")
-    # return verified, avg_diff
     verified = False  # Assume verification fails unless proven otherwise
     logits_d = []
     positive_changes = 0  # Counter for positive logit differences
@@ -282,6 +276,88 @@ def display_one_image_per_folder(root_folder, secret_labels,resnet50, optimizer,
             print(f"No images found in folder: {folder_name}")
     return all_logits_before, all_logits_after, logits_before_all,logits_after_all 
 
+
+def perturb_image_test_epsilon(image_path, true_label, target_labels, model, optimizer, EPS, save_image_to, iterations=350, save_dir="../output/testing_epsilon/"):
+    """
+    Perturb an image to embed a watermark and verify the watermark.
+    
+    Args:
+        image_path (str): Path to the input image.
+        true_label (int): Index of the true class (e.g., panda).
+        target_labels (list): Indices of the target classes (secret labels).
+        model (tf.keras.Model): Pre-trained ImageNet model.
+        optimizer (tf.keras.optimizers.Optimizer): Optimizer for training.
+    """
+    # Ensure the save directory exists
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Load and preprocess image
+    sample_image = show_image(image_path)
+    preprocessed_image = preprocess_image(sample_image)
+
+    preprocessed_path = os.path.join("../output", "preprocessed_image.png")
+    plt.imsave(preprocessed_path, preprocessed_image.squeeze())
+    print(f"Preprocessed image saved at: {preprocessed_path}")
+
+    # Generate predictions before any adversaries
+    unsafe_preds = model.predict(preprocess_input(preprocessed_image))
+    print("Logits before adv.:", decode_predictions(unsafe_preds, top=3)[0])
+
+    true_label = np.argmax(unsafe_preds, axis=1)[0]
+    print(f"True label (max logit): {IMAGENET_CLASSES[true_label]} (Index: {true_label})")
+
+    print("\nPredictions for secret labels BEFORE perturbation:")
+    for label in target_labels:
+        label_name = IMAGENET_CLASSES[label]
+        logit = (unsafe_preds[0, label])
+        print(f"Label: {label_name} (Index: {label}), Logit: {logit}")
+        
+    # Initialize the perturbation tensor
+    image_tensor = tf.constant(preprocessed_image, dtype=tf.float32)
+    delta = tf.Variable(tf.zeros_like(image_tensor), trainable=True)
+
+    # Generate adversarial perturbation
+    delta_tensor = generate_adversaries_targeted(image_tensor, delta, model, true_label, target_labels, optimizer, EPS, iterations)
+    plt.imshow(50 * delta_tensor.numpy().squeeze() + 0.5)
+    plt.show()
+
+    # Compute final perturbed image
+    final_image = (image_tensor + delta_tensor).numpy().squeeze()
+    final_image = np.clip(final_image, 0, 255).astype(np.uint8)  # Ensure pixel values are in the valid range
+    
+    output_path = os.path.join(save_dir, save_image_to)  # Save in the specified directory   
+    # Save the image
+    cv2.imwrite(output_path, cv2.cvtColor(final_image, cv2.COLOR_RGB2BGR))
+    print(f"Watermarked image saved at: {output_path}")
+
+    # Display perturbed image
+    plt.imshow((image_tensor + delta_tensor).numpy().squeeze() / 255)
+    plt.show()
+
+    # Generate prediction on perturbed image
+    perturbed_image = preprocess_input(image_tensor + delta_tensor)    
+    preds = model.predict(perturbed_image)
+
+    print("Logits after adv.:", decode_predictions(preds, top=3)[0])
+
+    # Print predictions for the secret labels
+    print("\nPredictions for secret labels:")
+    for label in target_labels:
+        label_name = IMAGENET_CLASSES[label]
+        logit = (preds[0, label])
+        print(f"Label: {label_name} (Index: {label}), Logit: {logit}")
+
+    # Verify the watermark
+    verified, avg_diff = verify_watermark(unsafe_preds, preds, target_labels, threshold=0.01)
+    if verified:
+        print("Watermark verified!")
+    else:
+        print("Watermark NOT verified.")
+
+    # Return logit scores for secret labels before and after watermarking
+    logits_before = {label: unsafe_preds[0, label] for label in target_labels}
+    logits_after = {label: preds[0, label] for label in target_labels}
+    return logits_before, logits_after, unsafe_preds, preds, avg_diff 
 
 
 

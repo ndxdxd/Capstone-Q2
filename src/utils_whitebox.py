@@ -7,7 +7,7 @@ import json
 import cv2
 import random
 from sklearn.metrics import roc_curve, auc
-IMAGENET_LABELS = "./data/imagenet_class_index.json"
+IMAGENET_LABELS = "../data/imagenet_class_index.json"
 with open(IMAGENET_LABELS) as f:
     IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
 # Function to load and display an image
@@ -40,7 +40,7 @@ def clip_eps(delta_tensor, EPS):
 def get_label(preds, IMAGENET_CLASSES):
     print(IMAGENET_CLASSES[preds.argmax()])
 
-def plot_logit_histograms(all_logits_before, all_logits_after, target_labels, bins=100, save_dir="./plots/"):
+def plot_logit_histograms(all_logits_before, all_logits_after, target_labels, bins=100, save_dir="../plots/"):
     """
     Plot histograms of logit scores before and after watermarking for each target label and save as images.
     
@@ -65,7 +65,7 @@ def plot_logit_histograms(all_logits_before, all_logits_after, target_labels, bi
         plt.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close()  # Close the figure to free memory
 
-def plot_combined_histogram(all_logits_before, all_logits_after, bins=100, save_dir="./plots/"):
+def plot_combined_histogram(all_logits_before, all_logits_after, bins=100, save_dir="../plots/"):
     """
     Plot a combined histogram of logit scores for all labels before and after watermarking and save as an image.
     
@@ -88,7 +88,7 @@ def plot_combined_histogram(all_logits_before, all_logits_after, bins=100, save_
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()  # Close the figure to free memory
 
-def plot_roc_curve(all_logits_before, all_logits_after, target_labels, save_dir="./plots/"):
+def plot_roc_curve(all_logits_before, all_logits_after, target_labels, save_dir="../plots/"):
     """
     Plot ROC curve for each target label to determine the optimal threshold and save as an image.
     

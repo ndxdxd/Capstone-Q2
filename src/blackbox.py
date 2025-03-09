@@ -9,9 +9,9 @@ import random
 import os
 import sys
 
-from src.utils_blackbox import show_image, preprocess_image, clip_eps, get_label
+from utils_blackbox import show_image, preprocess_image, clip_eps, get_label
 
-IMAGENET_LABELS = "./data/imagenet_class_index.json"
+IMAGENET_LABELS = "../data/imagenet_class_index.json"
 with open(IMAGENET_LABELS) as f:
     IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
 
@@ -120,7 +120,7 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, eps):
     delta_image = 50 * scaled_delta.numpy().squeeze() + 0.5  # Scale and shift
     delta_image = np.clip(delta_image, 0, 1)  # Ensure values are in [0,1]
     # Save the image
-    output_path = "./output/delta_image.png"
+    output_path = "../output/delta_image.png"
     plt.imsave(output_path, delta_image)  # Use cmap="gray" for better visualization
     print(f"Delta image saved at {output_path}")
 
@@ -132,7 +132,7 @@ def perturb_image(image_path, true_label, target_labels, model, optimizer, eps):
     final_image = np.clip(final_image, 0, 255).astype(np.uint8)  # Ensure pixel values are in valid range
 
     # Save the perturbed image
-    output_path = "blackbox_watermarked_image.jpg"
+    output_path = "../output/blackbox_watermarked_image.jpg"
     cv2.imwrite(output_path, cv2.cvtColor(final_image, cv2.COLOR_RGB2BGR))  # Convert RGB to BGR for OpenCV
     print(f"Watermarked image saved as {output_path}")
     return org, final
@@ -185,7 +185,7 @@ def perturb_image_2(image_path, true_label, target_labels, model, optimizer, eps
     final_image = np.clip(final_image, 0, 255).astype(np.uint8)  # Ensure pixel values are in valid range
 
     # Save the perturbed image
-    output_path = "blackbox_watermarked_image.jpg"
+    output_path = "../output/blackbox_watermarked_image.jpg"
     cv2.imwrite(output_path, cv2.cvtColor(final_image, cv2.COLOR_RGB2BGR))  # Convert RGB to BGR for OpenCV
     print(f"Watermarked image saved as {output_path}")
 
