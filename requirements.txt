@@ -12,3 +12,4 @@ compressai
 torch_fidelity
 accelerate
 onnxruntime
+kagglehub
