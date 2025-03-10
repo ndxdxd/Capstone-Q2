@@ -10,7 +10,9 @@ import random
 from PIL import Image
 from sklearn.metrics import roc_curve, auc
 import os
-
+IMAGENET_LABELS = "../data/imagenet_class_index.json"
+with open(IMAGENET_LABELS) as f:
+    IMAGENET_CLASSES = {int(i): x[1] for i, x in json.load(f).items()}
 
 # Function to load and display an image
 def show_image(image_path):
