@@ -17,10 +17,8 @@ To install the dependencies, run the following command from the root directory o
 Due to the nature of the size of the data, we can not publish it onto Github, but we are able to give the code to download it.
 To get the data, from the project root dir, run python run.py. This fetches the images from kaggle, creates saves the data in the imagenet1k-val folder.
 
-Use the demo.ipynb file in the notebook folder to look at the watermark creating and verification functions and run it. To run our project comprehensively, run the black box and white box attack files. 
-
 ## Recreating our Results
-There are 5 different notebooks in the notebook folder which we used to generate our results. Simply run through those notebooks to see the watermarking process as well as the visualizations we created.
+There are 5 different notebooks in the notebook folder which we used to generate our results. Simply run through those notebooks to see the watermarking process as well as the visualizations we created.  To run our project comprehensively, run the black box and white box attack notebook files first. Make sure you have the requirements installed first. 
 
 ## License and Attribution
 
